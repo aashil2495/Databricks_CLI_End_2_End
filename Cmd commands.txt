@@ -1,0 +1,112 @@
+Login to Azure Portal.
+az login
+
+Create Resource Group named myResourceGroup, you can replace it with your own name.
+az group create --name itmmyResourceGroup --location southcentralus
+
+Create a premium Databricks workspace named "myDatabricksWorkspace" in "myResourceGroup" resource group at location "southcentralus".
+az databricks workspace create --resource-group itmmyResourceGroup --name myDatabricksWorkspace --location southcentralus --sku premium
+
+Create Storage account named "itmmetastore"
+az storage account create --name itmmetastore --resource-group itmmyResourceGroup --location southcentralus --sku Standard_LRS --kind StorageV2 --hns true
+
+Create Container named "container" in storage account
+az storage container create --account-name itmmetastore --name container
+
+Create Storage account named "itmdatastoremedallion"
+az storage account create --name itmdatastoremedallion --resource-group itmmyResourceGroup --location southcentralus --sku Standard_LRS --kind StorageV2 --hns true
+
+Create Container named "raw" in storage account
+az storage container create --account-name itmdatastoremedallion --name raw
+
+Create Container named "bronze" in storage account
+az storage container create --account-name itmdatastoremedallion --name bronze
+
+Create Container named "silver" in storage account
+az storage container create --account-name itmdatastoremedallion --name silver
+
+Create Container named "gold" in storage account
+az storage container create --account-name itmdatastoremedallion --name gold
+
+
+List the containers in storage account.
+az storage container list --account-name itmmetastore --auth-mode login --query "[].name" -o table
+
+Create a token in Databricks by going to Databricks portal->click on your profile->Settings->Developer->Token
+
+Configure the Databricks PAT Token
+databricks configure --token
+
+Create unity catalog metastore in Databricks account
+databricks unity-catalog metastores create --name metastoresouthcentralus --storage-root abfss://container@itmmetastore.dfs.core.windows.net/ --region southcentralus
+
+Assign metastore to workspace. Replace workspace-id with your workspace-id and metastore-id with 
+databricks unity-catalog metastores assign --workspace-id 2802728894264871 --metastore-id a6c116d8-6ec1-460a-98d1-6f0f62e25695 --default-catalog-name main
+
+Create Databricks access connector
+az databricks access-connector create --resource-group itmmyResourceGroup --name itm-my-access-connector --location southcentralus --identity-type SystemAssigned
+
+List Datarbicks Access connector
+az databricks access-connector show --resource-group itmmyResourceGroup --name itm-my-access-connector --query "identity.principalId" -o tsv
+
+List Azure subscriptions
+az account list --output table
+
+List storage accounts
+az storage account list --output table
+
+Assign Role to Managed Identity(Access Connector) on "itmmetastore" storage account
+az role assignment create --assignee <Replace-id> --role "Storage Blob Data Contributor" --scope "/subscriptions/d066615d-e286-4bf1-92e7-7df087f1f4d0/resourceGroups/itmmyResourceGroup/providers/Microsoft.Storage/storageAccounts/itmmetastore"
+
+List access connectors
+az databricks access-connector list --output json
+
+Create storage credentails named "my_external_location_cred"
+databricks unity-catalog storage-credentials create --name my_external_location_cred --az-mi-access-connector-id "/subscriptions/d066615d-e286-4bf1-92e7-7df087f1f4d0/resourceGroups/itmmyResourceGroup/providers/Microsoft.Databricks/accessConnectors/itm-my-access-connector"
+
+Create External Location named "metastore" with storage credentails named "my_external_location_cred"
+databricks unity-catalog external-locations create --name metastore --url abfss://container@itmmetastore.dfs.core.windows.net/ --storage-credential-name my_external_location_cred
+---------------------------------------
+Assign Role to Managed Identity(Access Connector) on "itmdatastoremedallion" storage account
+az role assignment create --assignee <Replace-id> --role "Storage Blob Data Contributor" --scope "/subscriptions/d066615d-e286-4bf1-92e7-7df087f1f4d0/resourceGroups/itmmyResourceGroup/providers/Microsoft.Storage/storageAccounts/itmdatastoremedallion"
+
+Create External Location named "itmdatastoremedallion-raw" with storage credentails named "metastore-loc"
+databricks unity-catalog external-locations create --name itmdatastoremedallion-raw --url abfss://raw@itmdatastoremedallion.dfs.core.windows.net/ --storage-credential-name my_external_location_cred
+
+Create External Location named "itmdatastoremedallion-bronze" with storage credentails named "metastore-loc"
+databricks unity-catalog external-locations create --name itmdatastoremedallion-bronze --url abfss://bronze@itmdatastoremedallion.dfs.core.windows.net/ --storage-credential-name my_external_location_cred
+
+Create External Location named "itmdatastoremedallion-silver" with storage credentails named "metastore-loc"
+databricks unity-catalog external-locations create --name itmdatastoremedallion-silver --url abfss://silver@itmdatastoremedallion.dfs.core.windows.net/ --storage-credential-name my_external_location_cred
+
+Create External Location named "itmdatastoremedallion-gold" with storage credentails named "metastore-loc"
+databricks unity-catalog external-locations create --name itmdatastoremedallion-gold --url abfss://gold@itmdatastoremedallion.dfs.core.windows.net/ --storage-credential-name my_external_location_cred
+
+Create schema called "bronze" under "main" catalog
+databricks unity-catalog schemas create --catalog-name main --name bronze
+
+Create schema called "silver" under "main" catalog
+databricks unity-catalog schemas create --catalog-name main --name silver
+
+Create schema called "gold" under "main" catalog
+databricks unity-catalog schemas create --catalog-name main --name gold
+
+Copy files from local to Azure. Replace the local path
+azcopy cp "E:\ashil\End-to-End Databicks Project\Source Data\*" "https://itmdatastore.blob.core.windows.net/raw/"
+
+
+Upload the Databricks Notebooks to New Databricks workspace.
+
+Create Databricks job using notebooks
+databricks jobs create --json-file E:\ashil\End-to-End Databicks Project\databricks-medallion-job.json
+
+List the jobs created
+databricks jobs list
+
+Run job
+databricks jobs run-now --job-id <Replace your job id>
+
+
+dapid3337da80df894389232e6a4595824d4
+
+
