@@ -107,6 +107,3 @@ Run job
 databricks jobs run-now --job-id <Replace your job id>
 
 
-dapid3337da80df894389232e6a4595824d4
-
-
